@@ -2,38 +2,32 @@
 #include <iomanip>
 #include <limits>
 #include <string>
-#include <utility>
 
 class BankAccount {
-private:
     double balance;
-
-private:
     std::string accountHolder;
-
-private:
     const std::string accountNumber;
 
     // Validate amount for deposit/withdrawal
-    static bool isValidAmount(const double amount) {
+    static bool isValidAmount(const double amount) noexcept {
         return amount > 0.0 && amount < std::numeric_limits<double>::max();
     }
 
 public:
-    // Constructor with account holder and opening balance
+    // Constructor
     BankAccount(std::string holder, const double openingBalance, std::string accNum)
         : balance(openingBalance >= 0 ? openingBalance : 0.0),
           accountHolder(std::move(holder)),
           accountNumber(std::move(accNum)) {
         if (openingBalance < 0) {
-            std::cerr << "Warning: Negative opening balance. Set to $0.00\n";
+            std::cerr << "Warning: Negative opening balance set to $0.00\n";
         }
     }
 
     // Deposit method
-    bool deposit(const double amount) {
+    [[nodiscard]] bool deposit(const double amount) {
         if (!isValidAmount(amount)) {
-            std::cerr << "Error: Invalid deposit amount (" << amount << ").\n";
+            std::cerr << "Error: Invalid deposit amount ($" << amount << ").\n";
             return false;
         }
         balance += amount;
@@ -41,14 +35,13 @@ public:
     }
 
     // Withdraw method
-    bool withdraw(const double amount) {
+    [[nodiscard]] bool withdraw(const double amount) {
         if (!isValidAmount(amount)) {
-            std::cerr << "Error: Invalid withdrawal amount (" << amount << ").\n";
+            std::cerr << "Error: Invalid withdrawal amount ($" << amount << ").\n";
             return false;
         }
-
         if (amount > balance) {
-            std::cerr << "Error: Insufficient funds! Current balance: $" << balance << "\n";
+            std::cerr << "Error: Insufficient funds! Balance: $" << balance << "\n";
             return false;
         }
         balance -= amount;
@@ -57,54 +50,49 @@ public:
 
     // Display account details
     void display() const {
-        std::cout << std::fixed << std::setprecision(2);
-        std::cout << "\n=== Account Summary ===\n";
-        std::cout << "Holder  : " << accountHolder << "\n";
-        std::cout << "Number  : " << accountNumber << "\n";
-        std::cout << "Balance : $" << balance << "\n";
+        std::cout << std::fixed << std::setprecision(2)
+                << "\n=== Account Summary ===\n"
+                << "Holder : " << accountHolder << '\n'
+                << "Number : " << accountNumber << '\n'
+                << "Balance: $" << balance << '\n';
     }
 
     // Getters
-    [[nodiscard]] double getBalance() const { return balance; }
-    [[nodiscard]] const std::string &getAccountHolder() const { return accountHolder; }
-    [[nodiscard]] const std::string &getAccountNumber() const { return accountNumber; }
+    [[nodiscard]] double getBalance() const noexcept { return balance; }
+    [[nodiscard]] const std::string &getAccountHolder() const noexcept { return accountHolder; }
+    [[nodiscard]] const std::string &getAccountNumber() const noexcept { return accountNumber; }
 };
 
-// ------------------------------------------------------------
-// Helper: safely read a double value from input
+// Helper: safely read a double value
 double readDouble(const std::string &prompt) {
-    double value;
+    double value{};
     while (true) {
         std::cout << prompt;
-        if (std::cin >> value) {
-            return value;
-        }
+        if (std::cin >> value) return value;
+
         std::cerr << "Error: Invalid input. Please enter a number.\n";
         std::cin.clear();
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     }
 }
 
-// Helper: safely read an int value from input
+// Helper: safely read an int value
 int readInt(const std::string &prompt, int min, int max) {
-    int choice;
+    int value{};
     while (true) {
         std::cout << prompt;
-        if (std::cin >> choice && choice >= min && choice <= max) {
-            return choice;
-        }
+        if (std::cin >> value && value >= min && value <= max) return value;
+
         std::cerr << "Error: Enter a number between " << min << " and " << max << ".\n";
         std::cin.clear();
         std::cin.ignore(std::numeric_limits<std::streamsize>::max(), '\n');
     }
 }
 
-// ------------------------------------------------------------
 int main() {
-    // Initialize account with sample data
     BankAccount account("John Doe", 100.00, "ACC123456");
 
-    std::cout << "Welcome to the Bank Account Simulator\n";
+    std::cout << "Welcome to the Bank Account Manager\n";
     account.display();
 
     while (true) {
@@ -117,30 +105,32 @@ int main() {
         int choice = readInt("Enter choice (1-4): ", 1, 4);
 
         if (choice == 4) {
-            std::cout << "Exiting program. Final account state:\n";
+            std::cout << "Exiting. Final account state:\n";
             account.display();
             break;
         }
 
         switch (choice) {
-            case 1: {
-                // Deposit
-                double amount = readDouble("Enter deposit amount: $");
-                if (account.deposit(amount)) {
-                    std::cout << "Successfully deposited $" << std::fixed << std::setprecision(2) << amount << "\n";
+            case 1:
+                if (double amount = readDouble("Enter deposit amount: $");
+                    account.deposit(amount)) {
+                    std::cout << "Deposited $" << std::fixed << std::setprecision(2) << amount << '\n';
                 }
                 break;
-            }
-            case 2: {
-                // Withdraw
-                double amount = readDouble("Enter withdrawal amount: $");
-                if (account.withdraw(amount)) {
-                    std::cout << "Successfully withdrew $" << std::fixed << std::setprecision(2) << amount << "\n";
+
+            case 2:
+                if (double amount = readDouble("Enter withdrawal amount: $");
+                    account.withdraw(amount)) {
+                    std::cout << "Withdrew $" << std::fixed << std::setprecision(2) << amount << '\n';
                 }
                 break;
-            }
-            case 3: // Display
+
+            case 3:
                 account.display();
+                break;
+
+            default:
+                std::cerr << "Unexpected error: invalid menu option.\n";
                 break;
         }
     }

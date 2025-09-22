@@ -4,6 +4,7 @@ A simple project to practice and implement **Data Structures & Algorithms (DSA)*
 The goal is to build a strong foundation by coding classic structures and understanding their behavior.
 
 ## 🚀 Topics Covered
+
 - Arrays & Strings
 - Linked Lists
 - Stacks & Queues
@@ -12,6 +13,7 @@ The goal is to build a strong foundation by coding classic structures and unders
 - Other fundamental algorithms
 
 ## 🛠️ Tech
+
 - Language: **C++17/20**
 - Build system: **CMake**
 - IDE: **CLion**
@@ -34,3 +36,14 @@ cmake --build .
 
 # Run
 ./data_structures_cpp
+```
+
+### Book I'm reading :
+
+**Sam Teach yourself data structures in 24 Hours** : page **23**
+
+
+
+
+
+

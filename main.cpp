@@ -112,14 +112,14 @@ int main() {
 
         switch (choice) {
             case 1:
-                if (double amount = readDouble("Enter deposit amount: $");
+                if (const double amount = readDouble("Enter deposit amount: $");
                     account.deposit(amount)) {
                     std::cout << "Deposited $" << std::fixed << std::setprecision(2) << amount << '\n';
                 }
                 break;
 
             case 2:
-                if (double amount = readDouble("Enter withdrawal amount: $");
+                if (const double amount = readDouble("Enter withdrawal amount: $");
                     account.withdraw(amount)) {
                     std::cout << "Withdrew $" << std::fixed << std::setprecision(2) << amount << '\n';
                 }

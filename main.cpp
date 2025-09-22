@@ -78,7 +78,7 @@ double readDouble(const std::string &prompt) {
 }
 
 // Helper: safely read an int value
-int readInt(const std::string &prompt, int min, int max) {
+int readInt(const std::string &prompt, const int min, const int max) {
     int value{};
     while (true) {
         std::cout << prompt;
@@ -103,7 +103,7 @@ int main() {
                 << "3. Display Account\n"
                 << "4. Exit\n";
 
-        int choice = readInt("Enter choice (1-4): ", 1, 4);
+        const int choice = readInt("Enter choice (1-4): ", 1, 4);
 
         if (choice == 4) {
             std::cout << "Exiting. Final account state:\n";

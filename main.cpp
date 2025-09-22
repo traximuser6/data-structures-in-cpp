@@ -14,6 +14,7 @@ class BankAccount {
     }
 
 public:
+    // todo : constructor return type definition condition
     // Constructor
     BankAccount(std::string holder, const double openingBalance, std::string accNum)
         : balance(openingBalance >= 0 ? openingBalance : 0.0),

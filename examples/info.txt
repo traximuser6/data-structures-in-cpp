@@ -1,0 +1,6 @@
+book : A complete guide to programming in c++
+ullah kirch prinz and peter prinz
+
+
+page : 9
+chapter : fundamentals

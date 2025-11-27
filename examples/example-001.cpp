@@ -11,7 +11,6 @@ void message() {
 }
 
 int main() {
-
     for (int i = 0; i < 10; ++i) {
         line();
         cout << i << " " << endl;
@@ -21,5 +20,3 @@ int main() {
 
     return 0;
 }
-
-

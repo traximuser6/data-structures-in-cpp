@@ -4,6 +4,7 @@
 #include <string>
 
 class BankAccount {
+
     double balance;
     std::string accountHolder;
     const std::string accountNumber;

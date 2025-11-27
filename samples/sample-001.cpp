@@ -6,7 +6,7 @@ using namespace std;
 
 int main() {
 
-    cout << "hello world" << endl;
+    cout << "assalam o alaikum from samples/sample-001.cpp" << endl;
 
     return 0;
 }

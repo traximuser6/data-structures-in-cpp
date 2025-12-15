@@ -113,7 +113,7 @@ private:
     // Log a transaction
     void log(const std::string &type, double amount, bool success, const std::string &note = "") {
         std::ostringstream oss;
-        std::time_t t = std::time(nullptr);
+        const std::time_t t = std::time(nullptr);
         oss << std::put_time(std::localtime(&t), "%Y-%m-%d %H:%M:%S")
                 << " | " << std::left << std::setw(15) << type
                 << " | " << std::setw(12) << formatCurrency(amount)
@@ -130,7 +130,8 @@ private:
     }
 
 public:
-    explicit BankAccount(std::string holder, const std::string &accountPin, double opening = 0.0, std::string num = "")
+    explicit BankAccount(std::string holder, const std::string &accountPin, const double opening = 0.0,
+                         std::string num = "")
         : balance(opening >= 0 ? opening : 0.0),
           accountHolder(std::move(holder)),
           accountNumber(num.empty() ? generateAccountNumber() : std::move(num)),

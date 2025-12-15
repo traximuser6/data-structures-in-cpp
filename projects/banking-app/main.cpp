@@ -268,6 +268,7 @@ public:
     [[nodiscard]] bool isAccountFrozen() const noexcept { return isFrozen; }
 
     void display() {
+
         applyInterest();
         processRecurringDeposits();
 
@@ -294,7 +295,7 @@ public:
             std::cout << "No transactions.\n";
             return;
         }
-        int start = n <= 0 ? 0 : std::max(0, static_cast<int>(transactionHistory.size()) - n);
+        const int start = n <= 0 ? 0 : std::max(0, static_cast<int>(transactionHistory.size()) - n);
         for (int i = start; i < static_cast<int>(transactionHistory.size()); ++i)
             std::cout << transactionHistory[i] << '\n';
     }

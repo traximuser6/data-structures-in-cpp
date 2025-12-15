@@ -65,10 +65,12 @@ public:
             log("DEPOSIT", amount, false, "Frozen");
             return false;
         }
+
         if (!isValidAmount(amount)) {
             log("DEPOSIT", amount, false, "Invalid");
             return false;
         }
+
         balance += amount;
         log("DEPOSIT", amount, true);
         return true;
@@ -80,14 +82,17 @@ public:
             log("WITHDRAW", amount, false, "Frozen");
             return false;
         }
+
         if (!isValidAmount(amount)) {
             log("WITHDRAW", amount, false, "Invalid");
             return false;
         }
+
         if (dailyWithdrawn + amount > dailyWithdrawalLimit) {
             log("WITHDRAW", amount, false, "Daily limit");
             return false;
         }
+
         if (amount > balance) {
             log("WITHDRAW", amount, false, "No funds");
             return false;
@@ -145,8 +150,8 @@ public:
             return;
         }
 
-        int start = n <= 0 ? 0 : std::max(0, (int) transactionHistory.size() - n);
-        for (int i = start; i < (int) transactionHistory.size(); ++i)
+        int start = n <= 0 ? 0 : std::max(0, static_cast<int>(transactionHistory.size()) - n);
+        for (int i = start; i < static_cast<int>(transactionHistory.size()); ++i)
             std::cout << transactionHistory[i] << '\n';
     }
 
@@ -201,7 +206,7 @@ int main() {
             case 3: {
                 double amt = readDouble("Amount $");
                 std::cout << "To: 1.Bob 2.Charlie\n";
-                int t = readInt("", 1, 2);
+                const int t = readInt("", 1, 2);
                 cur->transfer(t == 1 ? a2 : a3, amt);
                 break;
             }
@@ -215,7 +220,7 @@ int main() {
                 break;
             case 7: {
                 std::cout << "1 Alice 2 Bob 3 Charlie\n";
-                int s = readInt("", 1, 3);
+                const int s = readInt("", 1, 3);
                 cur = (s == 1 ? &a1 : s == 2 ? &a2 : &a3);
                 cur->display();
                 break;

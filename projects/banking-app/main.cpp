@@ -364,12 +364,13 @@ int main() {
                 double amt = readDouble("Amount $");
                 std::cout << "To: 1.Bob 2.Charlie\n";
                 int t = readInt("", 1, 2);
-                BankAccount *target = (t == 1 ? &a2 : &a3);
-                if (target->isAccountFrozen()) {
+
+                if (BankAccount * target = (t == 1 ? &a2 : &a3); target->isAccountFrozen()) {
                     std::cout << "Transfer failed: Target account is frozen.\n";
                 } else if (!cur->transfer(*target, amt)) {
                     std::cout << "Transfer failed: Insufficient funds or invalid amount.\n";
                 }
+
                 break;
             }
             case 4:

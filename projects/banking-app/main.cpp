@@ -195,7 +195,7 @@ int main() {
         std::cout << "\n1 Deposit  2 Withdraw  3 Transfer  4 Balance\n"
                 << "5 History  6 Last 5   7 Switch    8 Freeze/Unfreeze\n"
                 << "9 Exit\n> ";
-        int ch = readInt("", 1, 9);
+        const int ch = readInt("", 1, 9);
         if (ch == 9) break;
 
         switch (ch) {

@@ -6,14 +6,13 @@
 #include <limits>
 #include <ctime>
 #include <algorithm>
-#include <cmath> // For std::round
+#include <cmath>
+#include <functional> // for std::hash
 
 // --- Utility Functions ---
 
 /**
  * Robustly reads a non-negative double value from standard input.
- * @param prompt The prompt string.
- * @return The valid double value.
  */
 double readDouble(const std::string &prompt) {
     double v;
@@ -27,11 +26,7 @@ double readDouble(const std::string &prompt) {
 }
 
 /**
- * Robustly reads an integer within a specified range from standard input.
- * @param prompt The prompt string.
- * @param lo The minimum allowed value.
- * @param hi The maximum allowed value.
- * @return The valid integer value.
+ * Robustly reads an integer within a specified range.
  */
 int readInt(const std::string &prompt, int lo, const int hi) {
     int v;
@@ -53,117 +48,162 @@ private:
     const std::string accountNumber;
     std::vector<std::string> transactionHistory;
 
-    // New Features & Optimizations
-    const std::string pin; // Added PIN for security
-    std::time_t lastActivity; // For interest calculation
-
+    // Security & State
+    const std::string hashedPin;
+    std::time_t lastActivity;
+    std::time_t lastWithdrawalReset;
     bool isFrozen = false;
+
+    // Limits & Features
     double dailyWithdrawalLimit = 5000.0;
     double dailyWithdrawn = 0.0;
-    static constexpr double ANNUAL_INTEREST_RATE = 0.02; // 2% annual rate
+    double overdraftLimit = -50.0; // Allow slight overdraft
+    double overdraftFee = 35.0; // Fee when going negative
+    static constexpr double ANNUAL_INTEREST_RATE = 0.02; // 2%
 
-    void resetDailyLimitsIfNeeded() {
-        static std::time_t lastReset = 0;
-        std::time_t now = std::time(nullptr);
-        struct tm *lt = std::localtime(&now);
+    // Recurring deposits: {amount, next deposit time, interval in days}
+    struct RecurringDeposit {
+        double amount;
+        std::time_t nextDeposit;
+        int intervalDays;
+    };
 
-        // Optimization: Check for reset only once per day
-        if (now - lastReset > 86400) {
-            // Check if more than 24 hours passed
-            lt->tm_hour = lt->tm_min = lt->tm_sec = 0;
-            std::time_t midnight = std::mktime(lt);
+    std::vector<RecurringDeposit> recurringDeposits;
 
-            if (lastReset < midnight) {
-                dailyWithdrawn = 0.0;
-                lastReset = midnight;
-                // Since this function is called on withdraw, it's a good place to update lastActivity
-                lastActivity = now;
-            }
-        }
-    }
-
-    [[nodiscard]] static bool isValidAmount(double amount) noexcept {
-        // Optimization: Use a reasonable float tolerance check (optional, but good practice)
-        return amount > 0.005 && amount <= 1e9;
-    }
-
-    void log(const std::string &type, double amount, bool success, const std::string &note = "") {
+    // Helper: Format currency
+    static std::string formatCurrency(double amount) {
         std::ostringstream oss;
-        std::time_t t = std::time(nullptr);
-        // Optimization: Use the system's timezone/locale settings for time format
-        oss << std::put_time(std::localtime(&t), "%Y-%m-%d %H:%M:%S")
-                << " | " << std::left << std::setw(12) << type
-                << " | $" << std::fixed << std::setprecision(2) << std::setw(10) << amount
-                << " | " << (success ? "SUCCESS " : "FAILED  ")
-                << " | Bal: $" << std::setw(10) << std::fixed << std::setprecision(2) << balance;
-        if (!note.empty()) oss << " | " << note;
-        transactionHistory.push_back(oss.str());
-
-        // Update activity time on any successful transaction
-        if (success) lastActivity = t;
+        oss << '$' << std::fixed << std::setprecision(2) << amount;
+        return oss.str();
     }
 
+    // Helper: Generate account number
     static std::string generateAccountNumber() {
         static int seq = 1000;
         return "ACC" + std::to_string(++seq);
     }
 
+    // Helper: Hash PIN (basic—use proper KDF in production)
+    static std::string hashPin(const std::string &pin) {
+        size_t hash = std::hash<std::string>{}(pin);
+        return std::to_string(hash);
+    }
+
+    // Reset daily withdrawal limit if new day
+    void resetDailyLimitsIfNeeded() {
+        std::time_t now = std::time(nullptr);
+        std::tm now_tm = *std::localtime(&now);
+        now_tm.tm_hour = 0;
+        now_tm.tm_min = 0;
+        now_tm.tm_sec = 0;
+        std::time_t todayStart = std::mktime(&now_tm);
+
+        std::tm last_tm = *std::localtime(&lastWithdrawalReset);
+        last_tm.tm_hour = 0;
+        last_tm.tm_min = 0;
+        last_tm.tm_sec = 0;
+        std::time_t lastResetDay = std::mktime(&last_tm);
+
+        if (todayStart > lastResetDay) {
+            dailyWithdrawn = 0.0;
+            lastWithdrawalReset = now;
+        }
+    }
+
+    // Log a transaction
+    void log(const std::string &type, double amount, bool success, const std::string &note = "") {
+        std::ostringstream oss;
+        std::time_t t = std::time(nullptr);
+        oss << std::put_time(std::localtime(&t), "%Y-%m-%d %H:%M:%S")
+                << " | " << std::left << std::setw(15) << type
+                << " | " << std::setw(12) << formatCurrency(amount)
+                << " | " << (success ? "SUCCESS" : "FAILED ")
+                << " | Bal: " << std::setw(12) << formatCurrency(balance);
+        if (!note.empty()) oss << " | " << note;
+        transactionHistory.push_back(oss.str());
+        if (success) lastActivity = t;
+    }
+
+    // Validate amount
+    [[nodiscard]] static bool isValidAmount(double amount) noexcept {
+        return amount > 0.005 && amount <= 1e9;
+    }
+
 public:
-    // Added PIN to constructor
     explicit BankAccount(std::string holder, const std::string &accountPin, double opening = 0.0, std::string num = "")
         : balance(opening >= 0 ? opening : 0.0),
           accountHolder(std::move(holder)),
           accountNumber(num.empty() ? generateAccountNumber() : std::move(num)),
-          pin(accountPin), // Initialize PIN
-          lastActivity(std::time(nullptr)) {
-        // Initialize last activity time
-
+          hashedPin(hashPin(accountPin)),
+          lastActivity(std::time(nullptr)),
+          lastWithdrawalReset(std::time(nullptr)) {
         if (opening < 0) std::cerr << "Negative balance corrected to $0.00\n";
         log("OPEN", balance, true);
     }
 
-    // Disallow copy construction and assignment for security and uniqueness
+    // Prevent copying
     BankAccount(const BankAccount &) = delete;
 
     BankAccount &operator=(const BankAccount &) = delete;
 
-    // New Feature: Simple authentication check
     [[nodiscard]] bool authenticate(const std::string &inputPin) const noexcept {
-        return pin == inputPin;
+        return hashedPin == hashPin(inputPin);
     }
 
-    // New Feature: Calculate and apply monthly interest
+    // Apply interest based on time since last activity
     void applyInterest() {
         std::time_t now = std::time(nullptr);
         double timeDiff = std::difftime(now, lastActivity);
-
-        // Calculate the number of full months passed (approx)
         int monthsPassed = static_cast<int>(std::floor(timeDiff / (30.0 * 24.0 * 3600.0)));
 
         if (monthsPassed >= 1 && balance > 0) {
             double monthlyRate = ANNUAL_INTEREST_RATE / 12.0;
             double interestAmount = balance * monthlyRate * monthsPassed;
-
-            // Round to 2 decimal places for accurate banking math
             interestAmount = std::round(interestAmount * 100.0) / 100.0;
-
             balance += interestAmount;
             log("INTEREST", interestAmount, true, "For " + std::to_string(monthsPassed) + " month(s)");
+            lastActivity = now;
         }
     }
 
+    // Add recurring deposit
+    void addRecurringDeposit(double amount, int days = 30) {
+        if (isValidAmount(amount)) {
+            recurringDeposits.push_back({amount, std::time(nullptr) + days * 86400, days});
+            log("RECURRING ADD", amount, true, "Every " + std::to_string(days) + " days");
+        }
+    }
+
+    // Process recurring deposits
+    void processRecurringDeposits() {
+        std::time_t now = std::time(nullptr);
+        bool applied = false;
+        for (auto &rd: recurringDeposits) {
+            if (now >= rd.nextDeposit) {
+                balance += rd.amount;
+                log("AUTO-DEPOSIT", rd.amount, true, "Recurring");
+                rd.nextDeposit += rd.intervalDays * 86400;
+                applied = true;
+            }
+        }
+        if (applied) lastActivity = now;
+    }
+
+    [[nodiscard]] bool canWithdraw(double amount) const {
+        if (isFrozen || !isValidAmount(amount)) return false;
+        if (balance - amount < overdraftLimit) return false;
+        return (dailyWithdrawn + amount <= dailyWithdrawalLimit);
+    }
+
+    [[nodiscard]] bool canReceive(double amount) const {
+        return !isFrozen && isValidAmount(amount);
+    }
+
     bool deposit(double amount) {
-        if (isFrozen) {
-            log("DEPOSIT", amount, false, "Frozen");
+        if (isFrozen || !isValidAmount(amount)) {
+            log("DEPOSIT", amount, false, isFrozen ? "Frozen" : "Invalid");
             return false;
         }
-
-        if (!isValidAmount(amount)) {
-            log("DEPOSIT", amount, false, "Invalid");
-            return false;
-        }
-
-        applyInterest(); // Apply interest before transaction
         balance += amount;
         log("DEPOSIT", amount, true);
         return true;
@@ -171,51 +211,47 @@ public:
 
     bool withdraw(double amount) {
         resetDailyLimitsIfNeeded();
-        if (isFrozen) {
-            log("WITHDRAW", amount, false, "Frozen");
+        if (!canWithdraw(amount)) {
+            if (isFrozen) {
+                log("WITHDRAW", amount, false, "Frozen");
+            } else if (balance - amount < overdraftLimit) {
+                log("WITHDRAW", amount, false, "Exceeds overdraft limit");
+            } else {
+                std::ostringstream oss;
+                oss << "Limit " << formatCurrency(dailyWithdrawalLimit - dailyWithdrawn) << " remaining";
+                log("WITHDRAW", amount, false, oss.str());
+            }
             return false;
         }
 
-        if (!isValidAmount(amount)) {
-            log("WITHDRAW", amount, false, "Invalid");
-            return false;
-        }
-
-        if (dailyWithdrawn + amount > dailyWithdrawalLimit) {
-            std::ostringstream oss;
-            oss << "Limit $" << std::fixed << std::setprecision(2) << dailyWithdrawalLimit - dailyWithdrawn <<
-                    " remaining";
-            log("WITHDRAW", amount, false, oss.str());
-            return false;
-        }
-
-        if (amount > balance) {
-            log("WITHDRAW", amount, false, "No funds");
-            return false;
-        }
-
-        applyInterest(); // Apply interest before transaction
+        double prevBalance = balance;
         balance -= amount;
         dailyWithdrawn += amount;
+
+        // Apply overdraft fee if crossing into negative
+        if (prevBalance >= 0 && balance < 0) {
+            balance -= overdraftFee;
+            log("OVERDRAFT FEE", overdraftFee, true);
+        }
+
         log("WITHDRAW", amount, true);
         return true;
     }
 
     bool transfer(BankAccount &to, double amount) {
-        // Optimization: Don't allow transfers to frozen accounts
-        if (this == &to || to.isFrozen) return false;
-
-        // Optimization: Use a local transaction object or scope guard for better rollback (omitted for minimal bloat)
-        if (withdraw(amount)) {
-            if (to.deposit(amount)) {
-                log("TRANSFER OUT", amount, true, "To " + to.accountNumber);
-                to.log("TRANSFER IN", amount, true, "From " + accountNumber);
-                return true;
-            }
-            // Rollback is still necessary if deposit fails for a non-frozen reason
-            deposit(amount);
+        if (this == &to) return false;
+        if (!canWithdraw(amount) || !to.canReceive(amount)) {
+            return false;
         }
-        return false;
+
+        // Perform atomic transfer
+        balance -= amount;
+        dailyWithdrawn += amount;
+        to.balance += amount;
+
+        log("TRANSFER OUT", amount, true, "To " + to.accountNumber);
+        to.log("TRANSFER IN", amount, true, "From " + accountNumber);
+        return true;
     }
 
     void freeze() {
@@ -231,17 +267,21 @@ public:
     [[nodiscard]] bool isAccountFrozen() const noexcept { return isFrozen; }
 
     void display() {
-        applyInterest(); // Always check/apply interest before displaying
+        applyInterest();
+        processRecurringDeposits();
+
         std::cout << "\n╔══════════════════════════════════════╗\n"
                 << "║            ACCOUNT SUMMARY           ║\n"
                 << "╠══════════════════════════════════════╣\n"
                 << "║ Holder   : " << std::setw(24) << std::left << accountHolder << " ║\n"
                 << "║ Account  : " << accountNumber
                 << std::string(std::max(0, 24 - (int) accountNumber.size()), ' ') << " ║\n"
-                << "║ Balance  : $" << std::setw(12) << std::fixed << std::setprecision(2) << balance
-                << (isFrozen ? " [FROZEN]" : "        ") << std::string(10, ' ') << "║\n"
-                << "║ Daily W/D: $" << std::setw(12) << std::fixed << std::setprecision(2) << (
-                    dailyWithdrawalLimit - dailyWithdrawn) << " remaining ║\n"
+                << "║ Balance  : " << std::setw(24) << std::left << formatCurrency(balance)
+                << (isFrozen ? "[FROZEN]" : "") << " ║\n"
+                << "║ Daily W/D: " << std::setw(24) << std::left
+                << formatCurrency(std::max(0.0, dailyWithdrawalLimit - dailyWithdrawn)) + " remaining" << " ║\n"
+                << "║ Overdraft: " << std::setw(24) << std::left
+                << (overdraftLimit < 0 ? formatCurrency(overdraftLimit) : "None") << " ║\n"
                 << "╚══════════════════════════════════════╝\n";
     }
 
@@ -253,21 +293,32 @@ public:
             std::cout << "No transactions.\n";
             return;
         }
-
-        int start = n <= 0 ? 0 : std::max(0, static_cast<int>(transactionHistory.size()) - n);
-        for (int i = start; i < static_cast<int>(transactionHistory.size()); ++i)
+        int start = n <= 0 ? 0 : std::max(0, (int) transactionHistory.size() - n);
+        for (int i = start; i < (int) transactionHistory.size(); ++i)
             std::cout << transactionHistory[i] << '\n';
     }
 
     // Getters
     [[nodiscard]] double getBalance() const noexcept { return balance; }
     [[nodiscard]] const std::string &getAccountNumber() const noexcept { return accountNumber; }
+    [[nodiscard]] const std::string &getHolder() const noexcept { return accountHolder; }
+
+    // Admin helper
+    static void displayAllAccounts(const std::vector<BankAccount *> &accounts) {
+        std::cout << "\n=== ADMIN VIEW: ALL ACCOUNTS ===\n";
+        for (const auto *acc: accounts) {
+            std::cout << "Account: " << acc->accountNumber
+                    << " | Holder: " << acc->accountHolder
+                    << " | Balance: " << formatCurrency(acc->balance)
+                    << (acc->isFrozen ? " [FROZEN]" : "")
+                    << '\n';
+        }
+    }
 };
 
 // --- Main Program ---
 
 int main() {
-    // Added PINs to the accounts
     BankAccount a1("Alice Johnson", "1234", 1000.0);
     BankAccount a2("Bob Smith", "0000", 300.0);
     BankAccount a3("Charlie Brown", "9999", 5000.0);
@@ -275,12 +326,12 @@ int main() {
     std::vector<BankAccount *> all_accounts = {&a1, &a2, &a3};
     BankAccount *cur = &a1;
 
-    std::cout << "SecureBank Pro v4.0\n";
+    std::cout << "SecureBank Pro v5.0 (Enhanced)\n";
 
-    // Initial Authentication
+    // Initial authentication
     std::cout << "\n--- Welcome, Alice ---\n";
     std::string pin_attempt;
-    std::cout << "Enter PIN for ACC" << cur->getAccountNumber() << ": ";
+    std::cout << "Enter PIN for " << cur->getAccountNumber() << ": ";
     std::cin >> pin_attempt;
 
     if (!cur->authenticate(pin_attempt)) {
@@ -292,33 +343,36 @@ int main() {
 
     while (true) {
         std::cout << "\n1 Deposit  2 Withdraw  3 Transfer  4 Balance\n"
-                << "5 History  6 Last 5   7 Switch    8 Freeze/Unfreeze\n"
-                << "9 Apply Interest 10 Exit\n> ";
-        // Updated range to 10
-        const int ch = readInt("", 1, 10);
-        if (ch == 10) break;
+                << "5 History  6 Last 5    7 Switch    8 Freeze/Unfreeze\n"
+                << "9 Interest 10 Recurring 11 Admin View 12 Exit\n> ";
+        const int ch = readInt("", 1, 12);
+        if (ch == 12) break;
 
         switch (ch) {
-            case 1: cur->deposit(readDouble("Deposit $"));
+            case 1: {
+                double amt = readDouble("Deposit $");
+                cur->deposit(amt);
                 break;
-            case 2: cur->withdraw(readDouble("Withdraw $"));
+            }
+            case 2: {
+                double amt = readDouble("Withdraw $");
+                cur->withdraw(amt);
                 break;
+            }
             case 3: {
                 double amt = readDouble("Amount $");
                 std::cout << "To: 1.Bob 2.Charlie\n";
-                const int t = readInt("", 1, 2);
+                int t = readInt("", 1, 2);
                 BankAccount *target = (t == 1 ? &a2 : &a3);
-
-                // New: Check if the target is frozen before attempting transfer
                 if (target->isAccountFrozen()) {
                     std::cout << "Transfer failed: Target account is frozen.\n";
-                    break;
+                } else if (!cur->transfer(*target, amt)) {
+                    std::cout << "Transfer failed: Insufficient funds or invalid amount.\n";
                 }
-
-                cur->transfer(*target, amt);
                 break;
             }
-            case 4: cur->display();
+            case 4:
+                cur->display();
                 break;
             case 5:
                 cur->showHistory();
@@ -328,12 +382,10 @@ int main() {
                 break;
             case 7: {
                 std::cout << "1 Alice 2 Bob 3 Charlie\n";
-                const int s = readInt("", 1, 3);
+                int s = readInt("", 1, 3);
                 BankAccount *next_account = all_accounts[s - 1];
-
                 std::cout << "Enter PIN for " << next_account->getAccountNumber() << ": ";
                 std::cin >> pin_attempt;
-
                 if (next_account->authenticate(pin_attempt)) {
                     cur = next_account;
                     cur->display();
@@ -343,14 +395,31 @@ int main() {
                 break;
             }
             case 8:
-                if (cur->isAccountFrozen()) cur->unfreeze();
-                else cur->freeze();
+                if (cur->isAccountFrozen()) {
+                    cur->unfreeze();
+                    std::cout << "Account unfrozen.\n";
+                } else {
+                    cur->freeze();
+                    std::cout << "Account frozen.\n";
+                }
                 break;
             case 9:
-                cur->applyInterest(); // Added manual trigger for interest
+                cur->applyInterest();
+                std::cout << "Interest applied (if eligible).\n";
                 break;
-            default: ;
+            case 10: {
+                double amt = readDouble("Auto-deposit amount $: ");
+                int days = readInt("Interval (days, default 30): ", 1, 365);
+                cur->addRecurringDeposit(amt, days);
+                break;
+            }
+            case 11:
+                BankAccount::displayAllAccounts(all_accounts);
+                break;
+            default:
+                break;
         }
     }
     std::cout << "\nGoodbye!\n";
+    return 0;
 }

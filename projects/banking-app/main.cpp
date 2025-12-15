@@ -152,8 +152,8 @@ public:
 
     // Apply interest based on time since last activity
     void applyInterest() {
-        std::time_t now = std::time(nullptr);
-        double timeDiff = std::difftime(now, lastActivity);
+        const std::time_t now = std::time(nullptr);
+        const double timeDiff = std::difftime(now, lastActivity);
         int monthsPassed = static_cast<int>(std::floor(timeDiff / (30.0 * 24.0 * 3600.0)));
 
         if (monthsPassed >= 1 && balance > 0) {
@@ -167,7 +167,7 @@ public:
     }
 
     // Add recurring deposit
-    void addRecurringDeposit(double amount, int days = 30) {
+    void addRecurringDeposit(const double amount, const int days = 30) {
         if (isValidAmount(amount)) {
             recurringDeposits.push_back({amount, std::time(nullptr) + days * 86400, days});
             log("RECURRING ADD", amount, true, "Every " + std::to_string(days) + " days");
@@ -176,30 +176,30 @@ public:
 
     // Process recurring deposits
     void processRecurringDeposits() {
-        std::time_t now = std::time(nullptr);
+        const std::time_t now = std::time(nullptr);
         bool applied = false;
-        for (auto &rd: recurringDeposits) {
-            if (now >= rd.nextDeposit) {
-                balance += rd.amount;
-                log("AUTO-DEPOSIT", rd.amount, true, "Recurring");
-                rd.nextDeposit += rd.intervalDays * 86400;
+        for (auto &[amount, nextDeposit, intervalDays]: recurringDeposits) {
+            if (now >= nextDeposit) {
+                balance += amount;
+                log("AUTO-DEPOSIT", amount, true, "Recurring");
+                nextDeposit += intervalDays * 86400;
                 applied = true;
             }
         }
         if (applied) lastActivity = now;
     }
 
-    [[nodiscard]] bool canWithdraw(double amount) const {
+    [[nodiscard]] bool canWithdraw(const double amount) const {
         if (isFrozen || !isValidAmount(amount)) return false;
         if (balance - amount < overdraftLimit) return false;
         return (dailyWithdrawn + amount <= dailyWithdrawalLimit);
     }
 
-    [[nodiscard]] bool canReceive(double amount) const {
+    [[nodiscard]] bool canReceive(const double amount) const {
         return !isFrozen && isValidAmount(amount);
     }
 
-    bool deposit(double amount) {
+    bool deposit(const double amount) {
         if (isFrozen || !isValidAmount(amount)) {
             log("DEPOSIT", amount, false, isFrozen ? "Frozen" : "Invalid");
             return false;
@@ -209,7 +209,7 @@ public:
         return true;
     }
 
-    bool withdraw(double amount) {
+    bool withdraw(const double amount) {
         resetDailyLimitsIfNeeded();
         if (!canWithdraw(amount)) {
             if (isFrozen) {
@@ -224,7 +224,7 @@ public:
             return false;
         }
 
-        double prevBalance = balance;
+        const double prevBalance = balance;
         balance -= amount;
         dailyWithdrawn += amount;
 
@@ -238,7 +238,7 @@ public:
         return true;
     }
 
-    bool transfer(BankAccount &to, double amount) {
+    bool transfer(BankAccount &to, const double amount) {
         if (this == &to) return false;
         if (!canWithdraw(amount) || !to.canReceive(amount)) {
             return false;
@@ -275,7 +275,7 @@ public:
                 << "╠══════════════════════════════════════╣\n"
                 << "║ Holder   : " << std::setw(24) << std::left << accountHolder << " ║\n"
                 << "║ Account  : " << accountNumber
-                << std::string(std::max(0, 24 - (int) accountNumber.size()), ' ') << " ║\n"
+                << std::string(std::max(0, 24 - static_cast<int>(accountNumber.size())), ' ') << " ║\n"
                 << "║ Balance  : " << std::setw(24) << std::left << formatCurrency(balance)
                 << (isFrozen ? "[FROZEN]" : "") << " ║\n"
                 << "║ Daily W/D: " << std::setw(24) << std::left
@@ -293,8 +293,8 @@ public:
             std::cout << "No transactions.\n";
             return;
         }
-        int start = n <= 0 ? 0 : std::max(0, (int) transactionHistory.size() - n);
-        for (int i = start; i < (int) transactionHistory.size(); ++i)
+        int start = n <= 0 ? 0 : std::max(0, static_cast<int>(transactionHistory.size()) - n);
+        for (int i = start; i < static_cast<int>(transactionHistory.size()); ++i)
             std::cout << transactionHistory[i] << '\n';
     }
 

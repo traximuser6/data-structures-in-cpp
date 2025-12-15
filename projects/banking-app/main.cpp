@@ -91,12 +91,12 @@ private:
 
     // Reset daily withdrawal limit if new day
     void resetDailyLimitsIfNeeded() {
-        std::time_t now = std::time(nullptr);
+        const std::time_t now = std::time(nullptr);
         std::tm now_tm = *std::localtime(&now);
         now_tm.tm_hour = 0;
         now_tm.tm_min = 0;
         now_tm.tm_sec = 0;
-        std::time_t todayStart = std::mktime(&now_tm);
+        const std::time_t todayStart = std::mktime(&now_tm);
 
         std::tm last_tm = *std::localtime(&lastWithdrawalReset);
         last_tm.tm_hour = 0;
@@ -111,7 +111,7 @@ private:
     }
 
     // Log a transaction
-    void log(const std::string &type, double amount, bool success, const std::string &note = "") {
+    void log(const std::string &type, const double amount, const bool success, const std::string &note = "") {
         std::ostringstream oss;
         const std::time_t t = std::time(nullptr);
         oss << std::put_time(std::localtime(&t), "%Y-%m-%d %H:%M:%S")
@@ -158,7 +158,7 @@ public:
         int monthsPassed = static_cast<int>(std::floor(timeDiff / (30.0 * 24.0 * 3600.0)));
 
         if (monthsPassed >= 1 && balance > 0) {
-            double monthlyRate = ANNUAL_INTEREST_RATE / 12.0;
+            constexpr double monthlyRate = ANNUAL_INTEREST_RATE / 12.0;
             double interestAmount = balance * monthlyRate * monthsPassed;
             interestAmount = std::round(interestAmount * 100.0) / 100.0;
             balance += interestAmount;

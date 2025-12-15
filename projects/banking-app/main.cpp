@@ -8,8 +8,6 @@
 #include <algorithm>
 
 class BankAccount {
-
-
 private:
     double balance;
     std::string accountHolder;

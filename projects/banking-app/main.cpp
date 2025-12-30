@@ -28,7 +28,7 @@ double readDouble(const std::string &prompt) {
 /**
  * Robustly reads an integer within a specified range.
  */
-int readInt(const std::string &prompt, int lo, const int hi) {
+int readInt(const std::string &prompt, const int lo, const int hi) {
     int v;
     std::cout << prompt;
     while (!(std::cin >> v) || v < lo || v > hi) {
@@ -71,7 +71,7 @@ private:
     std::vector<RecurringDeposit> recurringDeposits;
 
     // Helper: Format currency
-    static std::string formatCurrency(double amount) {
+    static std::string formatCurrency(const double amount) {
         std::ostringstream oss;
         oss << '$' << std::fixed << std::setprecision(2) << amount;
         return oss.str();
@@ -85,7 +85,7 @@ private:
 
     // Helper: Hash PIN (basic—use proper KDF in production)
     static std::string hashPin(const std::string &pin) {
-        size_t hash = std::hash<std::string>{}(pin);
+        const size_t hash = std::hash<std::string>{}(pin);
         return std::to_string(hash);
     }
 
@@ -102,9 +102,8 @@ private:
         last_tm.tm_hour = 0;
         last_tm.tm_min = 0;
         last_tm.tm_sec = 0;
-        std::time_t lastResetDay = std::mktime(&last_tm);
 
-        if (todayStart > lastResetDay) {
+        if (const std::time_t lastResetDay = std::mktime(&last_tm); todayStart > lastResetDay) {
             dailyWithdrawn = 0.0;
             lastWithdrawalReset = now;
         }
@@ -130,8 +129,7 @@ private:
     }
 
 public:
-    explicit BankAccount(std::string holder, const std::string &accountPin, const double opening = 0.0,
-                         std::string num = "")
+    explicit BankAccount(std::string holder, const std::string &accountPin, const double opening = 0.0, std::string num = "")
         : balance(opening >= 0 ? opening : 0.0),
           accountHolder(std::move(holder)),
           accountNumber(num.empty() ? generateAccountNumber() : std::move(num)),
@@ -155,9 +153,8 @@ public:
     void applyInterest() {
         const std::time_t now = std::time(nullptr);
         const double timeDiff = std::difftime(now, lastActivity);
-        int monthsPassed = static_cast<int>(std::floor(timeDiff / (30.0 * 24.0 * 3600.0)));
 
-        if (monthsPassed >= 1 && balance > 0) {
+        if (const int monthsPassed = static_cast<int>(std::floor(timeDiff / (30.0 * 24.0 * 3600.0))); monthsPassed >= 1 && balance > 0) {
             constexpr double monthlyRate = ANNUAL_INTEREST_RATE / 12.0;
             double interestAmount = balance * monthlyRate * monthsPassed;
             interestAmount = std::round(interestAmount * 100.0) / 100.0;

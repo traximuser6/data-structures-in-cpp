@@ -154,7 +154,8 @@ public:
         const std::time_t now = std::time(nullptr);
         const double timeDiff = std::difftime(now, lastActivity);
 
-        if (const int monthsPassed = static_cast<int>(std::floor(timeDiff / (30.0 * 24.0 * 3600.0))); monthsPassed >= 1 && balance > 0) {
+        if (const int monthsPassed = static_cast<int>(std::floor(timeDiff / (30.0 * 24.0 * 3600.0)));
+            monthsPassed >= 1 && balance > 0) {
             constexpr double monthlyRate = ANNUAL_INTEREST_RATE / 12.0;
             double interestAmount = balance * monthlyRate * monthsPassed;
             interestAmount = std::round(interestAmount * 100.0) / 100.0;
@@ -265,7 +266,6 @@ public:
     [[nodiscard]] bool isAccountFrozen() const noexcept { return isFrozen; }
 
     void display() {
-
         applyInterest();
         processRecurringDeposits();
 
@@ -363,7 +363,7 @@ int main() {
                 std::cout << "To: 1.Bob 2.Charlie\n";
                 int t = readInt("", 1, 2);
 
-                if (BankAccount * target = (t == 1 ? &a2 : &a3); target->isAccountFrozen()) {
+                if (BankAccount *target = (t == 1 ? &a2 : &a3); target->isAccountFrozen()) {
                     std::cout << "Transfer failed: Target account is frozen.\n";
                 } else if (!cur->transfer(*target, amt)) {
                     std::cout << "Transfer failed: Insufficient funds or invalid amount.\n";
